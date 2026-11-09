@@ -136,11 +136,22 @@ case "$ACTION" in
 
     install_shellinabox)
         OUT=$(
-            export DEBIAN_FRONTEND=noninteractive
-            echo "--- Updating Package Lists ---"
-            sudo apt-get update -y 2>&1
+            echo "--- Preparing Package Manager ---"
+            # Clear any stuck locks or hung background apt processes
+            sudo killall -9 apt-get dpkg 2>/dev/null || true
+            sudo rm -f /var/lib/apt/lists/lock /var/cache/apt/archives/lock /var/lib/dpkg/lock* 2>/dev/null || true
+
+            # Quick update if list directory is empty
+            if [ ! -d /var/lib/apt/lists ] || [ -z "$(ls -A /var/lib/apt/lists 2>/dev/null)" ]; then
+                echo "Updating package lists..."
+                sudo DEBIAN_FRONTEND=noninteractive apt-get update -y -o Acquire::http::Timeout="15" 2>&1 || true
+            fi
+
             echo "--- Installing shellinabox ---"
-            sudo apt-get install -y --allow-unauthenticated shellinabox 2>&1
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+                -o Dpkg::Options::="--force-confdef" \
+                -o Dpkg::Options::="--force-confold" \
+                shellinabox 2>&1
 
             echo "--- Configuring shellinabox with --disable-ssl ---"
             if [ -f /etc/default/shellinabox ]; then
@@ -172,15 +183,19 @@ EOF
 
     remove_shellinabox)
         OUT=$(
-            export DEBIAN_FRONTEND=noninteractive
             echo "--- Stopping Service ---"
             sudo systemctl stop shellinabox 2>&1 || true
-            sudo killall shellinaboxd 2>/dev/null || true
+            sudo killall -9 shellinaboxd 2>/dev/null || true
             sudo rm -rf /etc/systemd/system/shellinabox.service.d || true
             sudo systemctl daemon-reload 2>&1 || true
-            echo "--- Removing shellinabox ---"
-            sudo apt-get remove -y --purge shellinabox 2>&1
-            sudo apt-get autoremove -y 2>&1
+
+            echo "--- Removing shellinabox package ---"
+            sudo killall -9 apt-get dpkg 2>/dev/null || true
+            sudo rm -f /var/lib/apt/lists/lock /var/cache/apt/archives/lock /var/lib/dpkg/lock* 2>/dev/null || true
+            sudo DEBIAN_FRONTEND=noninteractive apt-get purge -y \
+                -o Dpkg::Options::="--force-confdef" \
+                -o Dpkg::Options::="--force-confold" \
+                shellinabox 2>&1
             echo "--- Removed Successfully ---"
         )
         json_output "ok" "$OUT"

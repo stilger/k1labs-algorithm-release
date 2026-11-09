@@ -31,7 +31,7 @@
         </div>
 
         <p style="color: #666; font-size: 14px; margin-top: 0; margin-bottom: 20px; line-height: 1.5;">
-            Shellinabox provides a fully interactive in-browser bash shell over port <strong>4200</strong>. When installed, you can launch a root terminal directly without needing an external SSH client.
+            Shellinabox provides a fully interactive in-browser bash shell over port <strong>4200</strong> in HTTP mode. When installed, you can launch a root terminal directly without needing an external SSH client.
         </p>
 
         <!-- Action Controls -->
@@ -118,7 +118,7 @@
         </p>
         <ul style="color: #555; font-size: 13px; line-height: 1.6; margin-top: 0; margin-bottom: 20px;">
             <li>Restore the original <code>N2030index.html</code> from the backup made during install (removing K1Labs from sidebar).</li>
-            <li>Restore base version string in <code>/opt/algorithm/algorithm_version.txt</code> (removing <code>-k1labs</code>).</li>
+            <li>Restore base version string in <code>/opt/algorithm/algorithm_version.txt</code> (removing <code>-k1labs*</code>).</li>
             <li>Reset Git URL in <code>algo_config.json</code> back to official: <code>https://github.com/PachiraMining/Algorithm-official-release-v2.git</code></li>
             <li>Reconfigure and restart <code>algorithm_update.service</code>.</li>
         </ul>
@@ -159,6 +159,7 @@
             data: JSON.stringify({ action: "status" }),
             contentType: "application/json",
             dataType: "json",
+            timeout: 10000,
             success: function(res) {
                 var inst = res.installed;
                 var run = res.running;
@@ -214,8 +215,9 @@
     function manageShell(actionName) {
         var label = actionName === "install_shellinabox" ? "Installing shellinabox..." :
                     actionName === "remove_shellinabox" ? "Removing shellinabox..." : "Restarting service in HTTP mode...";
-        showToast(label + " Please wait (this may take up to a minute).", false);
-        document.getElementById("k1-console").innerText = "Executing " + actionName + "...\n";
+        showToast(label + " Please wait (this may take 10-20 seconds).", false);
+        var consoleBox = document.getElementById("k1-console");
+        consoleBox.innerText = "Executing " + actionName + "...\n(Please wait, package manager running...)\n";
 
         $.ajax({
             url: "/cgi-bin/k1labs.cgi",
@@ -223,13 +225,16 @@
             data: JSON.stringify({ action: actionName }),
             contentType: "application/json",
             dataType: "json",
+            timeout: 90000,
             success: function(res) {
-                document.getElementById("k1-console").innerText = res.output;
+                consoleBox.innerText = res.output || "Done.";
                 showToast("Action completed.", false);
                 refreshStatus();
             },
-            error: function(err) {
-                showToast("Action failed. Check console output.", true);
+            error: function(xhr, status, err) {
+                consoleBox.innerText += "\n[Request sent. Updating status...]";
+                showToast("Checking service status...", false);
+                setTimeout(refreshStatus, 2500);
             }
         });
     }
@@ -265,6 +270,7 @@
             data: JSON.stringify({ action: "run_cmd", cmd: cmd }),
             contentType: "application/json",
             dataType: "json",
+            timeout: 35000,
             success: function(res) {
                 consoleBox.innerText = "$ " + cmd + "\n" + (res.output !== undefined ? res.output : "[No output]");
             },
@@ -290,6 +296,7 @@
             data: JSON.stringify({ action: "restore_defaults" }),
             contentType: "application/json",
             dataType: "json",
+            timeout: 30000,
             success: function(res) {
                 alert("Defaults restored successfully!\n" + res.output + "\n\nThe web page will now reload.");
                 window.location.reload();

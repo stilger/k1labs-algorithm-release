@@ -103,7 +103,7 @@ fi
 # 6. Determine and update algorithm version in /opt/algorithm/algorithm_version.txt
 echo "[7/7] Updating algorithm version tracker..."
 
-NEW_VERSION="A2.3.0-k1labs_v0.2"
+NEW_VERSION="A2.3.0-k1labs_v0.3"
 if [ -f "$SRC_DIR/algorithm_version.txt" ]; then
     PKG_VER=$(cat "$SRC_DIR/algorithm_version.txt" | tr -d '\r\n')
     if [ -n "$PKG_VER" ]; then
