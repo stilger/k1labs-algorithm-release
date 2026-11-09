@@ -72,6 +72,13 @@ echo "[5/6] Deploying rollback / restore utility..."
 sudo cp "$SRC_DIR/restore_k1labs.sh" /opt/algorithm/restore_k1labs.sh
 sudo chmod 755 /opt/algorithm/restore_k1labs.sh
 
+# If shellinabox is installed, configure it for HTTP mode (disabling SSL error in iframes)
+if [ -f /etc/default/shellinabox ]; then
+    echo "      Configuring shellinabox in HTTP mode..."
+    sudo sed -i 's/^SHELLINABOX_ARGS=.*/SHELLINABOX_ARGS="--no-beep --disable-ssl"/' /etc/default/shellinabox 2>/dev/null || true
+    sudo systemctl restart shellinabox 2>/dev/null || sudo /etc/init.d/shellinabox restart 2>/dev/null || true
+fi
+
 # 5. Determine and update algorithm version in /opt/algorithm/algorithm_version.txt
 echo "[6/6] Reading current version from /opt/algorithm/ and appending -k1labs..."
 

@@ -37,7 +37,7 @@
         <!-- Action Controls -->
         <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 15px;">
             <a id="btn-open-terminal" href="#" target="_blank" style="display: inline-flex; align-items: center; gap: 8px; text-decoration: none; background: #28a745; color: white; padding: 10px 22px; border-radius: 6px; font-weight: 600; font-size: 14px; box-shadow: 0 2px 6px rgba(40,167,69,0.25);">
-                &#x1F5B5; Open Terminal (Port 4200) &rarr;
+                &#x1F5B5; Open Terminal in New Tab (Port 4200) &rarr;
             </a>
 
             <button id="btn-toggle-embed" onclick="toggleEmbedTerminal()" style="display: none; background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-weight: 600; font-size: 14px; cursor: pointer;">
@@ -48,8 +48,8 @@
                 Install Shellinabox
             </button>
 
-            <button id="btn-restart" onclick="manageShell('restart_shellinabox')" style="background: #6c757d; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-weight: 600; font-size: 14px; cursor: pointer;">
-                Restart Service
+            <button id="btn-restart" onclick="manageShell('restart_shellinabox')" style="background: #6c757d; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-weight: 600; font-size: 14px; cursor: pointer;" title="Restarts shellinabox in HTTP mode (disabling self-signed SSL errors)">
+                Restart Service (HTTP)
             </button>
 
             <button id="btn-remove" onclick="manageShell('remove_shellinabox')" style="background: #dc3545; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-weight: 600; font-size: 14px; cursor: pointer;">
@@ -57,13 +57,13 @@
             </button>
         </div>
 
-        <div style="background: #fff8e1; border-left: 4px solid #ffc107; padding: 10px 15px; border-radius: 4px; font-size: 12px; color: #856404; line-height: 1.5;">
-            <strong>SSL Certificate Notice:</strong> Shellinabox uses a self-signed SSL certificate by default. When opening for the first time, your browser will display an <em>"Unrecognized certificate"</em> warning. Click <strong>Advanced &rarr; Proceed to IP (unsafe)</strong> to proceed to login.
-        </div>
-
-        <!-- Embedded Terminal Frame (optional) -->
+        <!-- Embedded Terminal Frame -->
         <div id="embed-terminal-container" style="display: none; margin-top: 20px;">
-            <iframe id="terminal-iframe" style="width: 100%; height: 500px; border: 2px solid #0065B2; border-radius: 8px; background: #000;"></iframe>
+            <div style="display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; border: 1px solid #dee2e6; border-bottom: none; padding: 8px 14px; border-top-left-radius: 8px; border-top-right-radius: 8px; font-size: 12px; color: #495057;">
+                <span>Embedded Console (Port 4200) &bull; If window is black, <a id="link-direct-term" href="#" target="_blank" style="color: #0065B2; font-weight: bold; text-decoration: underline;">click here to open in new tab</a></span>
+                <button onclick="toggleEmbedTerminal()" style="background: transparent; border: none; font-size: 16px; cursor: pointer; color: #6c757d;">&times;</button>
+            </div>
+            <iframe id="terminal-iframe" style="width: 100%; height: 500px; border: 2px solid #0065B2; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; background: #000;"></iframe>
         </div>
     </div>
 
@@ -89,7 +89,7 @@
         </div>
 
         <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-            <input type="text" id="k1-cmd-input" placeholder="Enter shell command (e.g. systemctl restart algorithm_update)..." 
+            <input type="text" id="k1-cmd-input" placeholder="Enter shell command (e.g. uptime)..." 
                    style="flex: 1; padding: 10px 14px; font-size: 14px; font-family: monospace; border: 1px solid #ced4da; border-radius: 6px; outline: none;"
                    onkeydown="if(event.key==='Enter') executeCommand();">
             <button id="btn-exec" onclick="executeCommand()" 
@@ -118,6 +118,7 @@
         </p>
         <ul style="color: #555; font-size: 13px; line-height: 1.6; margin-top: 0; margin-bottom: 20px;">
             <li>Restore the original <code>N2030index.html</code> from the backup made during install (removing K1Labs from sidebar).</li>
+            <li>Restore base version string in <code>/opt/algorithm/algorithm_version.txt</code> (removing <code>-k1labs</code>).</li>
             <li>Reset Git URL in <code>algo_config.json</code> back to official: <code>https://github.com/PachiraMining/Algorithm-official-release-v2.git</code></li>
             <li>Reconfigure and restart <code>algorithm_update.service</code>.</li>
         </ul>
@@ -132,7 +133,14 @@
 <script>
     var currentHost = window.location.hostname || "127.0.0.1";
     document.getElementById("k1-host").innerText = currentHost;
-    document.getElementById("btn-open-terminal").href = "https://" + currentHost + ":4200";
+
+    // Use current protocol (http: or https:) on port 4200
+    var termProtocol = window.location.protocol;
+    var termUrl = termProtocol + "//" + currentHost + ":4200";
+    document.getElementById("btn-open-terminal").href = termUrl;
+    if (document.getElementById("link-direct-term")) {
+        document.getElementById("link-direct-term").href = termUrl;
+    }
 
     function showToast(msg, isError) {
         var t = document.getElementById("k1-toast");
@@ -205,7 +213,7 @@
 
     function manageShell(actionName) {
         var label = actionName === "install_shellinabox" ? "Installing shellinabox..." :
-                    actionName === "remove_shellinabox" ? "Removing shellinabox..." : "Restarting service...";
+                    actionName === "remove_shellinabox" ? "Removing shellinabox..." : "Restarting service in HTTP mode...";
         showToast(label + " Please wait (this may take up to a minute).", false);
         document.getElementById("k1-console").innerText = "Executing " + actionName + "...\n";
 
@@ -230,7 +238,8 @@
         var box = document.getElementById("embed-terminal-container");
         var iframe = document.getElementById("terminal-iframe");
         if (box.style.display === "none") {
-            iframe.src = "https://" + currentHost + ":4200";
+            var termUrl = window.location.protocol + "//" + currentHost + ":4200";
+            iframe.src = termUrl;
             box.style.display = "block";
         } else {
             box.style.display = "none";
@@ -257,7 +266,7 @@
             contentType: "application/json",
             dataType: "json",
             success: function(res) {
-                consoleBox.innerText = "$ " + cmd + "\n" + (res.output || "[No output]");
+                consoleBox.innerText = "$ " + cmd + "\n" + (res.output !== undefined ? res.output : "[No output]");
             },
             error: function() {
                 consoleBox.innerText = "$ " + cmd + "\n[Error executing command through CGI]";

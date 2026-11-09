@@ -15,28 +15,16 @@ json_output() {
     local msg="$2"
     local extra="$3"
 
-    if command -v python >/dev/null 2>&1; then
-        python -c '
+    if command -v python >/dev/null 2>&1 || command -v python3 >/dev/null 2>&1; then
+        local py_bin="python"
+        command -v python >/dev/null 2>&1 || py_bin="python3"
+        "$py_bin" -c '
 import sys, json
 status = sys.argv[1]
 msg = sys.argv[2]
-extra = sys.argv[3] if len(sys.argv) > 3 and sys.argv[3] else "{}"
+extra_str = sys.argv[3] if len(sys.argv) > 3 and sys.argv[3] else "{}"
 try:
-    data = json.loads(extra)
-except Exception:
-    data = {}
-data["status"] = status
-data["output"] = msg
-print(json.dumps(data))
-' "$status" "$msg" "$extra"
-    elif command -v python3 >/dev/null 2>&1; then
-        python3 -c '
-import sys, json
-status = sys.argv[1]
-msg = sys.argv[2]
-extra = sys.argv[3] if len(sys.argv) > 3 and sys.argv[3] else "{}"
-try:
-    data = json.loads(extra)
+    data = json.loads(extra_str)
 except Exception:
     data = {}
 data["status"] = status
@@ -44,14 +32,13 @@ data["output"] = msg
 print(json.dumps(data))
 ' "$status" "$msg" "$extra"
     else
-        # Fallback simple escape
         local clean_msg
-        clean_msg=$(echo "$msg" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e ':a;N;$!ba;s/\n/\\n/g' -e 's/\r//g' -e 's/\t/\\t/g')
+        clean_msg=$(printf '%s' "$msg" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e ':a;N;$!ba;s/\n/\\n/g' -e 's/\r//g' -e 's/\t/\\t/g')
         echo "{\"status\":\"$status\",\"output\":\"$clean_msg\"}"
     fi
 }
 
-# Parse POST or GET data
+# Read request body
 REQ_BODY=""
 if [ "$REQUEST_METHOD" = "POST" ]; then
     if [ -n "$CONTENT_LENGTH" ] && [ "$CONTENT_LENGTH" -gt 0 ]; then
@@ -61,59 +48,56 @@ elif [ "$REQUEST_METHOD" = "GET" ]; then
     REQ_BODY="$QUERY_STRING"
 fi
 
-# Extract parameters
+# Parse parameters reliably
 ACTION=""
 CMD=""
 
-if command -v python >/dev/null 2>&1; then
-    eval "$(python -c '
-import sys, urllib.parse if sys.version_info[0] >= 3 else urllib, json
-raw = sys.argv[1]
+if command -v python >/dev/null 2>&1 || command -v python3 >/dev/null 2>&1; then
+    local_py="python"
+    command -v python >/dev/null 2>&1 || local_py="python3"
+    eval "$("$local_py" -c '
+import sys, json
+
+raw = sys.argv[1] if len(sys.argv) > 1 else ""
 action = ""
 cmd = ""
+
 try:
-    if raw.startswith("{"):
-        d = json.loads(raw)
+    raw_str = raw.strip()
+    if raw_str.startswith("{"):
+        d = json.loads(raw_str)
         action = d.get("action", "")
         cmd = d.get("cmd", "")
     else:
-        qs = urllib.parse.parse_qs(raw) if sys.version_info[0] >= 3 else urllib.parse.parse_qs(raw)
+        try:
+            from urllib.parse import parse_qs
+        except ImportError:
+            from urlparse import parse_qs
+        qs = parse_qs(raw_str)
         action = qs.get("action", [""])[0]
         cmd = qs.get("cmd", [""])[0]
 except Exception:
     pass
 
-import shlex
-print("ACTION=" + shlex.quote(action))
-print("CMD=" + shlex.quote(cmd))
-' "$REQ_BODY" 2>/dev/null)"
-elif command -v python3 >/dev/null 2>&1; then
-    eval "$(python3 -c '
-import sys, urllib.parse, json, shlex
-raw = sys.argv[1]
-action = ""
-cmd = ""
 try:
-    if raw.startswith("{"):
-        d = json.loads(raw)
-        action = d.get("action", "")
-        cmd = d.get("cmd", "")
-    else:
-        qs = urllib.parse.parse_qs(raw)
-        action = qs.get("action", [""])[0]
-        cmd = qs.get("cmd", [""])[0]
-except Exception:
-    pass
-print("ACTION=" + shlex.quote(action))
-print("CMD=" + shlex.quote(cmd))
+    from shlex import quote
+except ImportError:
+    from pipes import quote
+
+print("ACTION=" + quote(action))
+print("CMD=" + quote(cmd))
 ' "$REQ_BODY" 2>/dev/null)"
-else
-    # Simple regex fallback
-    ACTION=$(echo "$REQ_BODY" | grep -oP '(?<=action=)[^&]*' || echo "$REQ_BODY" | grep -oP '(?<="action":")[^"]*' || true)
-    CMD=$(echo "$REQ_BODY" | grep -oP '(?<=cmd=)[^&]*' || echo "$REQ_BODY" | grep -oP '(?<="cmd":")[^"]*' || true)
 fi
 
-# Default action if empty
+# Fallback regex if python parsing was empty
+if [ -z "$ACTION" ]; then
+    ACTION=$(echo "$REQ_BODY" | grep -oP '(?<="action":")[^"]*' || echo "$REQ_BODY" | grep -oP '(?<=action=)[^&]*' || true)
+fi
+if [ -z "$CMD" ]; then
+    CMD=$(echo "$REQ_BODY" | grep -oP '(?<="cmd":")[^"]*' || echo "$REQ_BODY" | grep -oP '(?<=cmd=)[^&]*' || true)
+fi
+
+# Default action if still empty
 if [ -z "$ACTION" ]; then
     ACTION="status"
 fi
@@ -157,7 +141,28 @@ case "$ACTION" in
             sudo apt-get update -y 2>&1
             echo "--- Installing shellinabox ---"
             sudo apt-get install -y --allow-unauthenticated shellinabox 2>&1
-            echo "--- Configuring & Starting Service ---"
+
+            echo "--- Configuring shellinabox with --disable-ssl ---"
+            if [ -f /etc/default/shellinabox ]; then
+                sudo sed -i 's/^SHELLINABOX_ARGS=.*/SHELLINABOX_ARGS="--no-beep --disable-ssl"/' /etc/default/shellinabox 2>/dev/null || true
+                if ! grep -q 'disable-ssl' /etc/default/shellinabox; then
+                    echo 'SHELLINABOX_ARGS="--no-beep --disable-ssl"' | sudo tee -a /etc/default/shellinabox >/dev/null
+                fi
+            fi
+
+            # Systemd service override to ensure --disable-ssl is passed
+            if [ -d /etc/systemd/system ]; then
+                sudo mkdir -p /etc/systemd/system/shellinabox.service.d
+                cat << 'EOF' > /tmp/shellinabox_override.conf
+[Service]
+ExecStart=
+ExecStart=/usr/bin/shellinaboxd -q -p 4200 --no-beep --disable-ssl
+EOF
+                sudo mv /tmp/shellinabox_override.conf /etc/systemd/system/shellinabox.service.d/override.conf
+                sudo systemctl daemon-reload 2>&1 || true
+            fi
+
+            echo "--- Starting Shellinabox Service (HTTP port 4200) ---"
             sudo systemctl enable shellinabox 2>&1 || true
             sudo systemctl restart shellinabox 2>&1 || sudo /etc/init.d/shellinabox restart 2>&1 || true
             echo "--- Done ---"
@@ -171,6 +176,8 @@ case "$ACTION" in
             echo "--- Stopping Service ---"
             sudo systemctl stop shellinabox 2>&1 || true
             sudo killall shellinaboxd 2>/dev/null || true
+            sudo rm -rf /etc/systemd/system/shellinabox.service.d || true
+            sudo systemctl daemon-reload 2>&1 || true
             echo "--- Removing shellinabox ---"
             sudo apt-get remove -y --purge shellinabox 2>&1
             sudo apt-get autoremove -y 2>&1
@@ -181,8 +188,22 @@ case "$ACTION" in
 
     restart_shellinabox)
         OUT=$(
+            echo "--- Configuring shellinabox for HTTP mode (--disable-ssl) ---"
+            if [ -f /etc/default/shellinabox ]; then
+                sudo sed -i 's/^SHELLINABOX_ARGS=.*/SHELLINABOX_ARGS="--no-beep --disable-ssl"/' /etc/default/shellinabox 2>/dev/null || true
+            fi
+            if [ -d /etc/systemd/system ]; then
+                sudo mkdir -p /etc/systemd/system/shellinabox.service.d
+                cat << 'EOF' > /tmp/shellinabox_override.conf
+[Service]
+ExecStart=
+ExecStart=/usr/bin/shellinaboxd -q -p 4200 --no-beep --disable-ssl
+EOF
+                sudo mv /tmp/shellinabox_override.conf /etc/systemd/system/shellinabox.service.d/override.conf
+                sudo systemctl daemon-reload 2>&1 || true
+            fi
             sudo systemctl restart shellinabox 2>&1 || sudo /etc/init.d/shellinabox restart 2>&1 || true
-            echo "Service restart issued."
+            echo "Service restarted in HTTP mode on port 4200 (no SSL warnings)."
         )
         json_output "ok" "$OUT"
         ;;
@@ -193,7 +214,6 @@ case "$ACTION" in
             exit 0
         fi
 
-        # Run command with 30s timeout
         OUT=$(timeout 30 bash -c "$CMD" 2>&1)
         EXIT_CODE=$?
         if [ $EXIT_CODE -eq 124 ]; then
