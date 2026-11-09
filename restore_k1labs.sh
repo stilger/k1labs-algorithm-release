@@ -24,7 +24,16 @@ sudo rm -f /var/www/html/k1labs.html
 sudo rm -f /usr/lib/cgi-bin/k1labs.cgi
 sudo rm -f /opt/algorithm/restore_k1labs.sh
 
-# 3. Restore default PachiraMining algorithm configuration
+# 3. Strip -k1labs suffix from algorithm version in /opt/algorithm/algorithm_version.txt
+if [ -f /opt/algorithm/algorithm_version.txt ]; then
+    echo "Restoring base algorithm version string in /opt/algorithm/algorithm_version.txt..."
+    CUR_VER=$(cat /opt/algorithm/algorithm_version.txt | tr -d '\r\n')
+    CLEAN_VER="${CUR_VER%-k1labs}"
+    [ -z "$CLEAN_VER" ] && CLEAN_VER="A2.3.0"
+    echo "$CLEAN_VER" | sudo tee /opt/algorithm/algorithm_version.txt >/dev/null
+fi
+
+# 4. Restore default PachiraMining algorithm configuration
 echo "Resetting /opt/algorithm/algo_config.json to official default..."
 sudo cat << 'EOF' > /tmp/default_algo_config.json
 {
@@ -36,7 +45,7 @@ EOF
 sudo mv /tmp/default_algo_config.json /opt/algorithm/algo_config.json
 sudo chmod 644 /opt/algorithm/algo_config.json
 
-# 4. Restore algorithm_update.service with default official Git URL
+# 5. Restore algorithm_update.service with default official Git URL
 echo "Restoring /etc/systemd/system/algorithm_update.service..."
 sudo cat << 'EOF' > /tmp/algorithm_update.service
 [Unit]
@@ -58,12 +67,12 @@ EOF
 sudo mv /tmp/algorithm_update.service /etc/systemd/system/algorithm_update.service
 sudo chmod 644 /etc/systemd/system/algorithm_update.service
 
-# 5. Reload systemd and restart algorithm update service
+# 6. Reload systemd and restart algorithm update service
 echo "Reloading systemd daemon and restarting algorithm_update..."
 sudo systemctl daemon-reload
 sudo systemctl restart algorithm_update.service || true
 
-# 6. Restart webserver to ensure cache is cleared
+# 7. Restart webserver to ensure cache is cleared
 echo "Restarting webserver..."
 sudo systemctl restart apache2 || true
 
