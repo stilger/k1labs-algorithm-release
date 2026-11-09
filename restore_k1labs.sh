@@ -21,11 +21,11 @@ echo "Cleaning up K1Labs files..."
 sudo rm -f /var/www/html/k1labs.html || true
 sudo rm -f /usr/lib/cgi-bin/k1labs.cgi || true
 
-# 3. Strip -k1labs suffix from algorithm version in /opt/algorithm/algorithm_version.txt
+# 3. Strip -k1labs* suffix from algorithm version in /opt/algorithm/algorithm_version.txt
 if [ -f /opt/algorithm/algorithm_version.txt ]; then
     echo "Restoring base algorithm version string in /opt/algorithm/algorithm_version.txt..."
     CUR_VER=$(cat /opt/algorithm/algorithm_version.txt | tr -d '\r\n')
-    CLEAN_VER="${CUR_VER%-k1labs}"
+    CLEAN_VER="${CUR_VER%-k1labs*}"
     [ -z "$CLEAN_VER" ] && CLEAN_VER="A2.3.0"
     echo "$CLEAN_VER" | sudo tee /opt/algorithm/algorithm_version.txt >/dev/null
 fi

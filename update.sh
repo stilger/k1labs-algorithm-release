@@ -74,45 +74,33 @@ sudo chmod 755 /opt/algorithm/restore_k1labs.sh
 
 # If shellinabox is installed, configure it for HTTP mode (disabling SSL error in iframes)
 if [ -f /etc/default/shellinabox ]; then
-    echo "      Configuring shellinabox in HTTP mode..."
+    echo "      Configuring shellinabox in HTTP mode (--disable-ssl)..."
     sudo sed -i 's/^SHELLINABOX_ARGS=.*/SHELLINABOX_ARGS="--no-beep --disable-ssl"/' /etc/default/shellinabox 2>/dev/null || true
+    if [ -d /etc/systemd/system ]; then
+        sudo mkdir -p /etc/systemd/system/shellinabox.service.d
+        cat << 'EOF' > /tmp/shellinabox_override.conf
+[Service]
+ExecStart=
+ExecStart=/usr/bin/shellinaboxd -q -p 4200 --no-beep --disable-ssl
+EOF
+        sudo mv /tmp/shellinabox_override.conf /etc/systemd/system/shellinabox.service.d/override.conf
+        sudo systemctl daemon-reload 2>&1 || true
+    fi
     sudo systemctl restart shellinabox 2>/dev/null || sudo /etc/init.d/shellinabox restart 2>/dev/null || true
 fi
 
 # 5. Determine and update algorithm version in /opt/algorithm/algorithm_version.txt
-echo "[6/6] Reading current version from /opt/algorithm/ and appending -k1labs..."
+echo "[6/6] Updating algorithm version tracker..."
 
-CURRENT_VER=""
-if [ -f /opt/algorithm/algorithm_version.txt ]; then
-    CURRENT_VER=$(cat /opt/algorithm/algorithm_version.txt | tr -d '\r\n')
+NEW_VERSION="A2.3.0-k1labs_v0.1"
+if [ -f "$SRC_DIR/algorithm_version.txt" ]; then
+    PKG_VER=$(cat "$SRC_DIR/algorithm_version.txt" | tr -d '\r\n')
+    if [ -n "$PKG_VER" ]; then
+        NEW_VERSION="$PKG_VER"
+    fi
 fi
 
-# Fallback to any other version files in /opt/algorithm if needed
-if [ -z "$CURRENT_VER" ]; then
-    for vf in /opt/algorithm/*version*.txt /opt/algorithm/*version*; do
-        if [ -f "$vf" ]; then
-            CURRENT_VER=$(cat "$vf" | tr -d '\r\n')
-            break
-        fi
-    done
-fi
-
-# Strip -k1labs if already present to prevent duplicate suffixes
-BASE_VER="${CURRENT_VER%-k1labs}"
-
-# If device had no existing version file, read from the update package
-if [ -z "$BASE_VER" ] && [ -f "$SRC_DIR/algorithm_version.txt" ]; then
-    FILE_VER=$(cat "$SRC_DIR/algorithm_version.txt" | tr -d '\r\n')
-    BASE_VER="${FILE_VER%-k1labs}"
-fi
-
-# Fallback default if completely empty
-if [ -z "$BASE_VER" ]; then
-    BASE_VER="A2.3.0"
-fi
-
-NEW_VERSION="${BASE_VER}-k1labs"
-echo "      Detected base version: '$BASE_VER' -> Writing '$NEW_VERSION' to /opt/algorithm/algorithm_version.txt"
+echo "      Writing version string '$NEW_VERSION' to /opt/algorithm/algorithm_version.txt"
 echo "$NEW_VERSION" | sudo tee /opt/algorithm/algorithm_version.txt >/dev/null
 
 # 6. Graceful webserver reload
