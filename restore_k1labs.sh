@@ -16,10 +16,11 @@ else
     sudo sed -i '/a_k1labs_1/,/spaceCell/d' /var/www/html/N2030index.html 2>/dev/null || true
 fi
 
-# 2. Remove K1Labs web and CGI files
+# 2. Remove K1Labs web, CGI, and sudoers configuration
 echo "Cleaning up K1Labs files..."
 sudo rm -f /var/www/html/k1labs.html || true
 sudo rm -f /usr/lib/cgi-bin/k1labs.cgi || true
+sudo rm -f /etc/sudoers.d/www-data || true
 
 # 3. Strip -k1labs* suffix from algorithm version in /opt/algorithm/algorithm_version.txt
 if [ -f /opt/algorithm/algorithm_version.txt ]; then

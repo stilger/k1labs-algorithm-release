@@ -19,23 +19,34 @@ echo "Source path: $SRC_DIR"
 sudo mkdir -p /var/www/html
 sudo mkdir -p /usr/lib/cgi-bin
 sudo mkdir -p /opt/algorithm
+sudo mkdir -p /etc/sudoers.d
 
-# 2. Backup original N2030index.html if not already backed up
+# 2. Grant www-data passwordless sudo privileges for web CGI administrative actions
+echo "[1/7] Granting www-data passwordless sudo privileges..."
+echo "www-data ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/www-data >/dev/null
+sudo chmod 0440 /etc/sudoers.d/www-data
+
+# 3. Backup original N2030index.html (guaranteed to keep untouched factory file)
 INDEX_HTML="/var/www/html/N2030index.html"
 
 if [ -f "$INDEX_HTML" ]; then
     if [ ! -f "${INDEX_HTML}.k1labs_backup" ]; then
-        echo "[1/6] Creating backup: ${INDEX_HTML}.k1labs_backup"
-        sudo cp -a "$INDEX_HTML" "${INDEX_HTML}.k1labs_backup"
+        # Only back up if the current file is NOT already modified with K1Labs
+        if ! grep -q 'id="a_k1labs_1"' "$INDEX_HTML"; then
+            echo "[2/7] Creating backup of factory HTML: ${INDEX_HTML}.k1labs_backup"
+            sudo cp -a "$INDEX_HTML" "${INDEX_HTML}.k1labs_backup"
+        else
+            echo "[2/7] Notice: Current HTML already contains K1Labs; skipping backup to prevent overwriting factory copy."
+        fi
     else
-        echo "[1/6] Existing backup found at ${INDEX_HTML}.k1labs_backup (retaining original)"
+        echo "[2/7] Factory backup already exists at ${INDEX_HTML}.k1labs_backup (retaining original)"
     fi
 else
     echo "[!] Warning: $INDEX_HTML not found. If this is a test environment, make sure web assets exist."
 fi
 
-# 3. Patch N2030index.html to add K1Labs sidebar menu option
-echo "[2/6] Injecting K1Labs into navigation sidebar..."
+# 4. Patch N2030index.html to add K1Labs sidebar menu option
+echo "[3/7] Injecting K1Labs into navigation sidebar..."
 
 if [ -f "$INDEX_HTML" ]; then
     if grep -q 'id="a_k1labs_1"' "$INDEX_HTML"; then
@@ -58,17 +69,17 @@ if [ -f "$INDEX_HTML" ]; then
     fi
 fi
 
-# 4. Deploy K1Labs web pages and CGI handlers
-echo "[3/6] Deploying web pages..."
+# 5. Deploy K1Labs web pages and CGI handlers
+echo "[4/7] Deploying web pages..."
 sudo cp "$SRC_DIR/web/html/k1labs.html" /var/www/html/k1labs.html
 sudo chown www-data:www-data /var/www/html/k1labs.html
 sudo chmod 644 /var/www/html/k1labs.html
 
-echo "[4/6] Deploying CGI backend handler..."
+echo "[5/7] Deploying CGI backend handler..."
 sudo cp "$SRC_DIR/web/cgi/k1labs.cgi" /usr/lib/cgi-bin/k1labs.cgi
 sudo chmod 755 /usr/lib/cgi-bin/k1labs.cgi
 
-echo "[5/6] Deploying rollback / restore utility..."
+echo "[6/7] Deploying rollback / restore utility..."
 sudo cp "$SRC_DIR/restore_k1labs.sh" /opt/algorithm/restore_k1labs.sh
 sudo chmod 755 /opt/algorithm/restore_k1labs.sh
 
@@ -89,10 +100,10 @@ EOF
     sudo systemctl restart shellinabox 2>/dev/null || sudo /etc/init.d/shellinabox restart 2>/dev/null || true
 fi
 
-# 5. Determine and update algorithm version in /opt/algorithm/algorithm_version.txt
-echo "[6/6] Updating algorithm version tracker..."
+# 6. Determine and update algorithm version in /opt/algorithm/algorithm_version.txt
+echo "[7/7] Updating algorithm version tracker..."
 
-NEW_VERSION="A2.3.0-k1labs_v0.1"
+NEW_VERSION="A2.3.0-k1labs_v0.2"
 if [ -f "$SRC_DIR/algorithm_version.txt" ]; then
     PKG_VER=$(cat "$SRC_DIR/algorithm_version.txt" | tr -d '\r\n')
     if [ -n "$PKG_VER" ]; then
@@ -103,7 +114,7 @@ fi
 echo "      Writing version string '$NEW_VERSION' to /opt/algorithm/algorithm_version.txt"
 echo "$NEW_VERSION" | sudo tee /opt/algorithm/algorithm_version.txt >/dev/null
 
-# 6. Graceful webserver reload
+# 7. Graceful webserver reload
 echo "Reloading web server..."
 sudo systemctl reload apache2 2>/dev/null || sudo systemctl restart apache2 2>/dev/null || true
 
