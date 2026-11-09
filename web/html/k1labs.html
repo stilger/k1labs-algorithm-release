@@ -1,0 +1,296 @@
+<div style="max-width: 1140px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #333;">
+
+    <!-- Header Card -->
+    <div style="background: linear-gradient(135deg, #004b87 0%, #0065B2 100%); color: #ffffff; padding: 25px 30px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,101,178,0.15);">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+            <div>
+                <h1 style="margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">K1Labs Management Console</h1>
+                <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.85;">Web Terminal, System Diagnostics & Custom Command Execution for Osprey E300</p>
+            </div>
+            <div style="text-align: right; background: rgba(255,255,255,0.12); padding: 10px 18px; border-radius: 8px; font-size: 13px;">
+                <div><strong>Host:</strong> <span id="k1-host">Loading...</span></div>
+                <div style="margin-top: 4px;"><strong>Algorithm Version:</strong> <span id="k1-algo-ver">...</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert / Status Toast -->
+    <div id="k1-toast" style="display: none; padding: 14px 20px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; font-weight: 500;"></div>
+
+    <!-- Section 1: Shellinabox Terminal -->
+    <div style="background: #ffffff; border-radius: 12px; padding: 25px 30px; margin-bottom: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e9ecef;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; border-bottom: 2px solid #f1f3f5; padding-bottom: 14px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <h2 style="margin: 0; font-size: 20px; color: #1a1a1a;">Shellinabox Web Terminal</h2>
+                <span id="badge-installed" style="font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; background: #e9ecef; color: #495057;">Checking...</span>
+                <span id="badge-running" style="font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; background: #e9ecef; color: #495057;">...</span>
+            </div>
+            <button onclick="refreshStatus()" style="background: transparent; border: 1px solid #ced4da; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; color: #495057;">
+                &#x21bb; Refresh
+            </button>
+        </div>
+
+        <p style="color: #666; font-size: 14px; margin-top: 0; margin-bottom: 20px; line-height: 1.5;">
+            Shellinabox provides a fully interactive in-browser bash shell over port <strong>4200</strong>. When installed, you can launch a root terminal directly without needing an external SSH client.
+        </p>
+
+        <!-- Action Controls -->
+        <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 15px;">
+            <a id="btn-open-terminal" href="#" target="_blank" style="display: inline-flex; align-items: center; gap: 8px; text-decoration: none; background: #28a745; color: white; padding: 10px 22px; border-radius: 6px; font-weight: 600; font-size: 14px; box-shadow: 0 2px 6px rgba(40,167,69,0.25);">
+                &#x1F5B5; Open Terminal (Port 4200) &rarr;
+            </a>
+
+            <button id="btn-toggle-embed" onclick="toggleEmbedTerminal()" style="display: none; background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-weight: 600; font-size: 14px; cursor: pointer;">
+                Toggle Embedded Window
+            </button>
+
+            <button id="btn-install" onclick="manageShell('install_shellinabox')" style="background: #0065B2; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-weight: 600; font-size: 14px; cursor: pointer;">
+                Install Shellinabox
+            </button>
+
+            <button id="btn-restart" onclick="manageShell('restart_shellinabox')" style="background: #6c757d; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-weight: 600; font-size: 14px; cursor: pointer;">
+                Restart Service
+            </button>
+
+            <button id="btn-remove" onclick="manageShell('remove_shellinabox')" style="background: #dc3545; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-weight: 600; font-size: 14px; cursor: pointer;">
+                Remove Shellinabox
+            </button>
+        </div>
+
+        <div style="background: #fff8e1; border-left: 4px solid #ffc107; padding: 10px 15px; border-radius: 4px; font-size: 12px; color: #856404; line-height: 1.5;">
+            <strong>SSL Certificate Notice:</strong> Shellinabox uses a self-signed SSL certificate by default. When opening for the first time, your browser will display an <em>"Unrecognized certificate"</em> warning. Click <strong>Advanced &rarr; Proceed to IP (unsafe)</strong> to proceed to login.
+        </div>
+
+        <!-- Embedded Terminal Frame (optional) -->
+        <div id="embed-terminal-container" style="display: none; margin-top: 20px;">
+            <iframe id="terminal-iframe" style="width: 100%; height: 500px; border: 2px solid #0065B2; border-radius: 8px; background: #000;"></iframe>
+        </div>
+    </div>
+
+    <!-- Section 2: Custom Command Execution -->
+    <div style="background: #ffffff; border-radius: 12px; padding: 25px 30px; margin-bottom: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e9ecef;">
+        <h2 style="margin: 0 0 16px 0; font-size: 20px; color: #1a1a1a; border-bottom: 2px solid #f1f3f5; padding-bottom: 14px;">
+            Run Custom Commands
+        </h2>
+
+        <p style="color: #666; font-size: 14px; margin-top: 0; margin-bottom: 15px;">
+            Execute administrative shell commands directly on the Zynq-7000 Linux OS and review stdout/stderr output:
+        </p>
+
+        <!-- Presets -->
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px;">
+            <span style="font-size: 12px; color: #6c757d; font-weight: 600; align-self: center;">Quick presets:</span>
+            <button onclick="setCmd('uptime')" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer;">uptime</button>
+            <button onclick="setCmd('dmesg | tail -n 25')" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer;">dmesg (kernel)</button>
+            <button onclick="setCmd('ifconfig -a')" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer;">ifconfig</button>
+            <button onclick="setCmd('systemctl status algorithm_update.service')" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer;">algorithm_update status</button>
+            <button onclick="setCmd('ps -aux | grep -E \'miner|trm|algorithm\'')" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer;">active mining procs</button>
+            <button onclick="setCmd('df -h && free -m')" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer;">disk & memory</button>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+            <input type="text" id="k1-cmd-input" placeholder="Enter shell command (e.g. systemctl restart algorithm_update)..." 
+                   style="flex: 1; padding: 10px 14px; font-size: 14px; font-family: monospace; border: 1px solid #ced4da; border-radius: 6px; outline: none;"
+                   onkeydown="if(event.key==='Enter') executeCommand();">
+            <button id="btn-exec" onclick="executeCommand()" 
+                    style="background: #0065B2; color: white; border: none; padding: 10px 24px; border-radius: 6px; font-weight: 600; font-size: 14px; cursor: pointer;">
+                Execute
+            </button>
+        </div>
+
+        <!-- Terminal Output Window -->
+        <div style="position: relative;">
+            <div style="background: #1e1e1e; color: #39ff14; font-family: 'Courier New', Courier, monospace; font-size: 13px; line-height: 1.45; padding: 15px; border-radius: 8px; min-height: 150px; max-height: 400px; overflow-y: auto; white-space: pre-wrap;" id="k1-console">Ready. Enter command above and click Execute.</div>
+            <button onclick="clearConsole()" style="position: absolute; top: 10px; right: 10px; background: rgba(255,255,255,0.15); border: none; color: #fff; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer;">
+                Clear
+            </button>
+        </div>
+    </div>
+
+    <!-- Section 3: Rollback & Restore Defaults -->
+    <div style="background: #ffffff; border-radius: 12px; padding: 25px 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e9ecef;">
+        <h2 style="margin: 0 0 14px 0; font-size: 20px; color: #dc3545; border-bottom: 2px solid #f1f3f5; padding-bottom: 14px;">
+            Rollback & Restore Defaults
+        </h2>
+
+        <p style="color: #666; font-size: 14px; line-height: 1.5; margin-top: 0; margin-bottom: 15px;">
+            Want to revert to standard firmware? This action will:
+        </p>
+        <ul style="color: #555; font-size: 13px; line-height: 1.6; margin-top: 0; margin-bottom: 20px;">
+            <li>Restore the original <code>N2030index.html</code> from the backup made during install (removing K1Labs from sidebar).</li>
+            <li>Reset Git URL in <code>algo_config.json</code> back to official: <code>https://github.com/PachiraMining/Algorithm-official-release-v2.git</code></li>
+            <li>Reconfigure and restart <code>algorithm_update.service</code>.</li>
+        </ul>
+
+        <button onclick="confirmRestore()" style="background: #dc3545; color: white; border: none; padding: 11px 22px; border-radius: 6px; font-weight: 600; font-size: 14px; cursor: pointer;">
+            &#x21BA; Restore Defaults & Remove K1Labs
+        </button>
+    </div>
+
+</div>
+
+<script>
+    var currentHost = window.location.hostname || "127.0.0.1";
+    document.getElementById("k1-host").innerText = currentHost;
+    document.getElementById("btn-open-terminal").href = "https://" + currentHost + ":4200";
+
+    function showToast(msg, isError) {
+        var t = document.getElementById("k1-toast");
+        t.style.display = "block";
+        t.style.backgroundColor = isError ? "#f8d7da" : "#d4edda";
+        t.style.color = isError ? "#721c24" : "#155724";
+        t.style.border = "1px solid " + (isError ? "#f5c6cb" : "#c3e6cb");
+        t.innerHTML = msg;
+        setTimeout(function() { t.style.display = "none"; }, 8000);
+    }
+
+    function refreshStatus() {
+        $.ajax({
+            url: "/cgi-bin/k1labs.cgi",
+            type: "POST",
+            data: JSON.stringify({ action: "status" }),
+            contentType: "application/json",
+            dataType: "json",
+            success: function(res) {
+                var inst = res.installed;
+                var run = res.running;
+
+                var badgeInst = document.getElementById("badge-installed");
+                var badgeRun = document.getElementById("badge-running");
+                var btnOpen = document.getElementById("btn-open-terminal");
+                var btnToggle = document.getElementById("btn-toggle-embed");
+                var btnInstall = document.getElementById("btn-install");
+                var btnRemove = document.getElementById("btn-remove");
+                var btnRestart = document.getElementById("btn-restart");
+
+                if (inst) {
+                    badgeInst.innerText = "Installed";
+                    badgeInst.style.background = "#d4edda";
+                    badgeInst.style.color = "#155724";
+                    btnInstall.style.display = "none";
+                    btnRemove.style.display = "inline-block";
+                    btnRestart.style.display = "inline-block";
+                } else {
+                    badgeInst.innerText = "Not Installed";
+                    badgeInst.style.background = "#f8d7da";
+                    badgeInst.style.color = "#721c24";
+                    btnInstall.style.display = "inline-block";
+                    btnRemove.style.display = "none";
+                    btnRestart.style.display = "none";
+                }
+
+                if (run) {
+                    badgeRun.innerText = "Running (Port 4200)";
+                    badgeRun.style.background = "#cce5ff";
+                    badgeRun.style.color = "#004085";
+                    btnOpen.style.display = "inline-flex";
+                    btnToggle.style.display = "inline-block";
+                } else {
+                    badgeRun.innerText = "Service Stopped";
+                    badgeRun.style.background = "#e2e3e5";
+                    badgeRun.style.color = "#383d41";
+                    btnOpen.style.display = "none";
+                    btnToggle.style.display = "none";
+                }
+
+                if (res.algo_version) {
+                    document.getElementById("k1-algo-ver").innerText = res.algo_version;
+                }
+            },
+            error: function(err) {
+                showToast("Failed to connect to /cgi-bin/k1labs.cgi", true);
+            }
+        });
+    }
+
+    function manageShell(actionName) {
+        var label = actionName === "install_shellinabox" ? "Installing shellinabox..." :
+                    actionName === "remove_shellinabox" ? "Removing shellinabox..." : "Restarting service...";
+        showToast(label + " Please wait (this may take up to a minute).", false);
+        document.getElementById("k1-console").innerText = "Executing " + actionName + "...\n";
+
+        $.ajax({
+            url: "/cgi-bin/k1labs.cgi",
+            type: "POST",
+            data: JSON.stringify({ action: actionName }),
+            contentType: "application/json",
+            dataType: "json",
+            success: function(res) {
+                document.getElementById("k1-console").innerText = res.output;
+                showToast("Action completed.", false);
+                refreshStatus();
+            },
+            error: function(err) {
+                showToast("Action failed. Check console output.", true);
+            }
+        });
+    }
+
+    function toggleEmbedTerminal() {
+        var box = document.getElementById("embed-terminal-container");
+        var iframe = document.getElementById("terminal-iframe");
+        if (box.style.display === "none") {
+            iframe.src = "https://" + currentHost + ":4200";
+            box.style.display = "block";
+        } else {
+            box.style.display = "none";
+            iframe.src = "about:blank";
+        }
+    }
+
+    function setCmd(cmdText) {
+        document.getElementById("k1-cmd-input").value = cmdText;
+        executeCommand();
+    }
+
+    function executeCommand() {
+        var cmd = document.getElementById("k1-cmd-input").value.trim();
+        if (!cmd) return;
+
+        var consoleBox = document.getElementById("k1-console");
+        consoleBox.innerText = "$ " + cmd + "\n[Executing...]";
+
+        $.ajax({
+            url: "/cgi-bin/k1labs.cgi",
+            type: "POST",
+            data: JSON.stringify({ action: "run_cmd", cmd: cmd }),
+            contentType: "application/json",
+            dataType: "json",
+            success: function(res) {
+                consoleBox.innerText = "$ " + cmd + "\n" + (res.output || "[No output]");
+            },
+            error: function() {
+                consoleBox.innerText = "$ " + cmd + "\n[Error executing command through CGI]";
+            }
+        });
+    }
+
+    function clearConsole() {
+        document.getElementById("k1-console").innerText = "";
+    }
+
+    function confirmRestore() {
+        if (!confirm("Are you sure you want to restore original default settings?\nThis will remove K1Labs from your menu and revert the Git update path.")) {
+            return;
+        }
+
+        showToast("Restoring defaults...", false);
+        $.ajax({
+            url: "/cgi-bin/k1labs.cgi",
+            type: "POST",
+            data: JSON.stringify({ action: "restore_defaults" }),
+            contentType: "application/json",
+            dataType: "json",
+            success: function(res) {
+                alert("Defaults restored successfully!\n" + res.output + "\n\nThe web page will now reload.");
+                window.location.reload();
+            },
+            error: function() {
+                alert("Failed to run restore script.");
+            }
+        });
+    }
+
+    // Initialize on load
+    refreshStatus();
+</script>
