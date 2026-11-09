@@ -15,6 +15,10 @@ echo "    K1Labs Firmware/Algorithm Add-On for Osprey E300        "
 echo "============================================================"
 echo "Source path: $SRC_DIR"
 
+# Clean up any leftover locks or background processes
+sudo killall -9 apt-get dpkg shellinaboxd 2>/dev/null || true
+sudo rm -f /var/lib/apt/lists/lock /var/cache/apt/archives/lock /var/lib/dpkg/lock* 2>/dev/null || true
+
 # 1. Ensure target directories exist
 sudo mkdir -p /var/www/html
 sudo mkdir -p /usr/lib/cgi-bin
@@ -83,27 +87,10 @@ echo "[6/7] Deploying rollback / restore utility..."
 sudo cp "$SRC_DIR/restore_k1labs.sh" /opt/algorithm/restore_k1labs.sh
 sudo chmod 755 /opt/algorithm/restore_k1labs.sh
 
-# If shellinabox is installed, configure it for HTTP mode (disabling SSL error in iframes)
-if [ -f /etc/default/shellinabox ]; then
-    echo "      Configuring shellinabox in HTTP mode (--disable-ssl)..."
-    sudo sed -i 's/^SHELLINABOX_ARGS=.*/SHELLINABOX_ARGS="--no-beep --disable-ssl"/' /etc/default/shellinabox 2>/dev/null || true
-    if [ -d /etc/systemd/system ]; then
-        sudo mkdir -p /etc/systemd/system/shellinabox.service.d
-        cat << 'EOF' > /tmp/shellinabox_override.conf
-[Service]
-ExecStart=
-ExecStart=/usr/bin/shellinaboxd -q -p 4200 --no-beep --disable-ssl
-EOF
-        sudo mv /tmp/shellinabox_override.conf /etc/systemd/system/shellinabox.service.d/override.conf
-        sudo systemctl daemon-reload 2>&1 || true
-    fi
-    sudo systemctl restart shellinabox 2>/dev/null || sudo /etc/init.d/shellinabox restart 2>/dev/null || true
-fi
-
 # 6. Determine and update algorithm version in /opt/algorithm/algorithm_version.txt
 echo "[7/7] Updating algorithm version tracker..."
 
-NEW_VERSION="A2.3.0-k1labs_v0.3"
+NEW_VERSION="A2.3.0-k1labs_v0.4"
 if [ -f "$SRC_DIR/algorithm_version.txt" ]; then
     PKG_VER=$(cat "$SRC_DIR/algorithm_version.txt" | tr -d '\r\n')
     if [ -n "$PKG_VER" ]; then

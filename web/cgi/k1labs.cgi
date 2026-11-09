@@ -166,14 +166,16 @@ case "$ACTION" in
                 sudo mkdir -p /etc/systemd/system/shellinabox.service.d
                 cat << 'EOF' > /tmp/shellinabox_override.conf
 [Service]
+Type=forking
 ExecStart=
-ExecStart=/usr/bin/shellinaboxd -q -p 4200 --no-beep --disable-ssl
+ExecStart=/usr/bin/shellinaboxd -q -b -p 4200 --no-beep --disable-ssl
 EOF
                 sudo mv /tmp/shellinabox_override.conf /etc/systemd/system/shellinabox.service.d/override.conf
                 sudo systemctl daemon-reload 2>&1 || true
             fi
 
             echo "--- Starting Shellinabox Service (HTTP port 4200) ---"
+            sudo killall -9 shellinaboxd 2>/dev/null || true
             sudo systemctl enable shellinabox 2>&1 || true
             sudo systemctl restart shellinabox 2>&1 || sudo /etc/init.d/shellinabox restart 2>&1 || true
             echo "--- Done ---"
@@ -211,12 +213,14 @@ EOF
                 sudo mkdir -p /etc/systemd/system/shellinabox.service.d
                 cat << 'EOF' > /tmp/shellinabox_override.conf
 [Service]
+Type=forking
 ExecStart=
-ExecStart=/usr/bin/shellinaboxd -q -p 4200 --no-beep --disable-ssl
+ExecStart=/usr/bin/shellinaboxd -q -b -p 4200 --no-beep --disable-ssl
 EOF
                 sudo mv /tmp/shellinabox_override.conf /etc/systemd/system/shellinabox.service.d/override.conf
                 sudo systemctl daemon-reload 2>&1 || true
             fi
+            sudo killall -9 shellinaboxd 2>/dev/null || true
             sudo systemctl restart shellinabox 2>&1 || sudo /etc/init.d/shellinabox restart 2>&1 || true
             echo "Service restarted in HTTP mode on port 4200 (no SSL warnings)."
         )
